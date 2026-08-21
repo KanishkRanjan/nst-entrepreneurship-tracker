@@ -169,7 +169,7 @@ const adminSections: NavSection[] = [
 
 export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { user, role, isStaff, isAdmin, signOut } = useAuth();
+  const { user, role, isStaff, isAdmin, signOut, status } = useAuth();
 
   // Active state checker
   const isItemActive = (item: NavItem) => {
@@ -212,7 +212,7 @@ export function AppSidebar() {
 
       {/* Main Navigation Content */}
       <SidebarContent className="px-2 py-3 space-y-4 overflow-y-auto">
-        {sections.map((section) => (
+        {status !== "loading" && sections.map((section) => (
           <SidebarGroup key={section.id} className="p-0">
             {/* Section Header */}
             <SidebarGroupLabel className="font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground/60 px-3 py-1.5 mb-1 select-none">
@@ -302,7 +302,7 @@ export function AppSidebar() {
         </div>
 
         {/* Apply Now Button for students only */}
-        {!isStaff && <ApplyNowButton className="w-full justify-center shadow-sm" />}
+        {status !== "loading" && !isStaff && <ApplyNowButton className="w-full justify-center shadow-sm" />}
 
         {/* Footer Version Tag */}
         <p className="text-center font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground/50 select-none">
