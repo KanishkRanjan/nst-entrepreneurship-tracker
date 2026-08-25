@@ -13,23 +13,27 @@ const isBoard = (a: Actor) => a.role === "admin" || a.role === "academic_board";
 const isMentorOf = (a: Actor, ventureMentorId: string | null) =>
   a.role === "mentor" && ventureMentorId !== null && ventureMentorId === a.userId;
 
+const isOwnStudent = (a: Actor, ventureUserId?: string | null) =>
+  a.role === "student" && ventureUserId != null && ventureUserId === a.userId;
+
 export function canAddKpi(
   a: Actor,
   ventureUserId: string | null,
-  ventureMentorId: string | null
+  ventureMentorId: string | null,
 ): boolean {
-  return (
-    isBoard(a) ||
-    a.role === "student"
-  );
+  return isBoard(a) || isMentorOf(a, ventureMentorId) || isOwnStudent(a, ventureUserId);
 }
 
 export function canEditKpi(a: Actor, ctx: KpiContext): boolean {
   return (
     isBoard(a) ||
     (isMentorOf(a, ctx.ventureMentorId) && !ctx.isLocked) ||
-    (a.role === "student" && !ctx.isLocked)
+    (isOwnStudent(a, ctx.ventureUserId) && !ctx.isLocked)
   );
+}
+
+export function canGradeKpi(a: Actor, ctx: KpiContext): boolean {
+  return isBoard(a) || (isMentorOf(a, ctx.ventureMentorId) && !ctx.isLocked);
 }
 
 export function canLockKpi(a: Actor, ctx: KpiContext): boolean {
@@ -72,4 +76,4 @@ export function mustPickMentorToAccept(a: Actor): boolean {
   return isBoard(a);
 }
 
-export { isBoard, isMentorOf };
+export { isBoard, isMentorOf, isOwnStudent };
