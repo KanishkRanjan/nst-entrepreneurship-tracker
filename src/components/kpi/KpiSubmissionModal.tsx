@@ -37,6 +37,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import type { TablesUpdate } from "@/integrations/supabase/types";
 import { canEditKpi, canLockKpi, canUnlockKpi, type Actor } from "@/lib/permissions";
 import { sendLockedKpiEmailsFn } from "@/lib/email/email.actions";
 import { uploadSubmissionServerFn, downloadSubmissionServerFn } from "@/lib/submission.actions";
@@ -137,52 +138,65 @@ export function KpiSubmissionModal({
   const [showLockConfirm, setShowLockConfirm] = useState(false);
 
   useEffect(() => {
-    if (open && target) {
-      fetchSubmission();
-      setScoreInput(target.score != null ? String(target.score) : "");
-      setFeedbackInput(target.feedback ?? "");
-      setSelectedFile(null);
-      setActiveTab("submission");
-    } else {
+    if (!open || !target) {
       setSubmission(null);
       setSelectedFile(null);
       setNote("");
       setIsEditing(false);
+      return;
     }
-  }, [open, target]);
 
-  const fetchSubmission = async () => {
-    if (!target) return;
+    setScoreInput(target.score != null ? String(target.score) : "");
+    setFeedbackInput(target.feedback ?? "");
+    setSelectedFile(null);
+    setActiveTab("submission");
+
+    let cancelled = false;
     setLoadingSubmission(true);
-    try {
-      const { data, error } = await supabase
-        .from("kpi_submissions")
-        .select("*")
-        .eq("kpi_id", target.kpiId)
-        .maybeSingle();
 
-      if (error) {
-        console.error("[SubmissionModal] Error fetching submission:", error);
-      } else if (data) {
-        setSubmission(data as KpiSubmissionData);
-        setNote(data.note || "");
-        setIsEditing(false);
-      } else {
-        setSubmission(null);
-        setNote("");
-        setIsEditing(true);
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("kpi_submissions")
+          .select("*")
+          .eq("kpi_id", target.kpiId)
+          .order("submitted_at", { ascending: false })
+          .limit(1);
+
+        if (cancelled) return;
+
+        if (error) {
+          console.error("[SubmissionModal] Error fetching submission:", error);
+        } else if (data && data.length > 0) {
+          const row = data[0] as KpiSubmissionData;
+          setSubmission(row);
+          setNote(row.note || "");
+          setIsEditing(false);
+        } else {
+          setSubmission(null);
+          setNote("");
+          setIsEditing(true);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("[SubmissionModal] Failed to load submission:", err);
+        }
+      } finally {
+        if (!cancelled) setLoadingSubmission(false);
       }
-    } catch (err) {
-      console.error("[SubmissionModal] Failed to load submission:", err);
-    } finally {
-      setLoadingSubmission(false);
-    }
-  };
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, target]);
 
   if (!target) return null;
 
   const isDueDatePassed = Boolean(
-    target.dueDate && !Number.isNaN(new Date(target.dueDate).getTime()) && new Date() > new Date(target.dueDate)
+    target.dueDate &&
+    !Number.isNaN(new Date(target.dueDate).getTime()) &&
+    new Date() > new Date(target.dueDate),
   );
 
   const isScoredOrLocked = target.isLocked || target.score !== null;
@@ -254,19 +268,21 @@ export function KpiSubmissionModal({
         },
       });
 
-      if (!result || result.success === false) {
-        throw new Error((result as any)?.error || (result as any)?.statusMessage || "Upload to AWS S3 failed.");
+      if (!result || !result.success) {
+        throw new Error(result?.error || "Upload to AWS S3 failed.");
       }
 
       toast.success(
-        submission ? "Submission updated successfully!" : "Submission uploaded successfully!"
+        submission ? "Submission updated successfully!" : "Submission uploaded successfully!",
       );
       setSelectedFile(null);
       setIsEditing(false);
       onSaved();
       onOpenChange(false); // Automatically close modal after save
-    } catch (err: any) {
-      toast.error(err.message || "Failed to process submission");
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof Error && err.message ? err.message : "Failed to process submission",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -283,18 +299,18 @@ export function KpiSubmissionModal({
         },
       });
 
-      if (result && result.success && result.url && result.url.startsWith("http")) {
-        window.open(result.url, "_blank");
-        return;
-      }
-
-      if (result && result.error) {
+      if (result && result.success) {
+        if (result.url && result.url.startsWith("http")) {
+          window.open(result.url, "_blank");
+          return;
+        }
+      } else if (result && result.error) {
         throw new Error(result.error);
       }
 
       throw new Error(`AWS S3 download link unavailable. Storage key: ${submission.storage_path}`);
-    } catch (err: any) {
-      toast.error(err.message || "Could not download file.");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error && err.message ? err.message : "Could not download file.");
     } finally {
       setDownloading(false);
     }
@@ -320,7 +336,7 @@ export function KpiSubmissionModal({
       const { data: sessionData } = await supabase.auth.getSession();
       const evaluatorId = sessionData.session?.user?.id || null;
 
-      const updateData: any = {
+      const updateData: TablesUpdate<"venture_kpis"> = {
         score: parsed,
         feedback: feedbackInput.trim() || null,
         scored_by: evaluatorId,
@@ -364,8 +380,8 @@ export function KpiSubmissionModal({
 
       onSaved();
       onOpenChange(false);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save score");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error && err.message ? err.message : "Failed to save score");
     } finally {
       setSavingScore(false);
     }
@@ -387,8 +403,8 @@ export function KpiSubmissionModal({
       toast.success("KPI unlocked for evaluation.");
       onSaved();
       onOpenChange(false);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to unlock KPI");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error && err.message ? err.message : "Failed to unlock KPI");
     } finally {
       setSavingScore(false);
     }
@@ -438,7 +454,10 @@ export function KpiSubmissionModal({
                   <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                     Submitted Evidence
                   </span>
-                  <Badge variant="outline" className="font-mono text-[10px] bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+                  <Badge
+                    variant="outline"
+                    className="font-mono text-[10px] bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                  >
                     <CheckCircle2 className="mr-1 h-3 w-3" /> Submitted
                   </Badge>
                 </div>
@@ -450,7 +469,8 @@ export function KpiSubmissionModal({
                         {submission.file_name}
                       </p>
                       <p className="font-mono text-[10px] text-muted-foreground">
-                        {formatBytes(submission.size_bytes)} · Submitted {formatDateTime(submission.submitted_at)}
+                        {formatBytes(submission.size_bytes)} · Submitted{" "}
+                        {formatDateTime(submission.submitted_at)}
                       </p>
                     </div>
                   </div>
@@ -462,7 +482,11 @@ export function KpiSubmissionModal({
                     disabled={downloading}
                     className="font-mono text-xs border-primary/30 text-primary cursor-pointer shrink-0"
                   >
-                    {downloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                    {downloading ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Download className="h-3.5 w-3.5" />
+                    )}
                     Download
                   </Button>
                 </div>
@@ -555,10 +579,15 @@ export function KpiSubmissionModal({
               {/* Supporting Explanation */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="submission-note" className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+                  <Label
+                    htmlFor="submission-note"
+                    className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground"
+                  >
                     Explain your submission
                   </Label>
-                  <span className={`font-mono text-[10px] ${note.length > MAX_NOTE_LENGTH ? "text-destructive" : "text-muted-foreground"}`}>
+                  <span
+                    className={`font-mono text-[10px] ${note.length > MAX_NOTE_LENGTH ? "text-destructive" : "text-muted-foreground"}`}
+                  >
                     {note.length} / {MAX_NOTE_LENGTH}
                   </span>
                 </div>
@@ -592,7 +621,9 @@ export function KpiSubmissionModal({
                 </Button>
                 <Button
                   type="submit"
-                  disabled={submitting || (!selectedFile && !submission) || note.length > MAX_NOTE_LENGTH}
+                  disabled={
+                    submitting || (!selectedFile && !submission) || note.length > MAX_NOTE_LENGTH
+                  }
                   className="font-mono text-xs cursor-pointer"
                 >
                   {submitting ? (
@@ -612,7 +643,11 @@ export function KpiSubmissionModal({
           )
         ) : (
           /* ================= EVALUATOR REVIEW & SCORE TABS ================= */
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full pt-2">
+          <Tabs
+            value={activeTab}
+            onValueChange={(v) => setActiveTab(v as "submission" | "score")}
+            className="w-full pt-2"
+          >
             <TabsList className="grid grid-cols-2 w-full font-mono text-xs">
               <TabsTrigger type="button" value="submission">
                 <FileText className="mr-2 h-3.5 w-3.5" />
@@ -633,23 +668,37 @@ export function KpiSubmissionModal({
               ) : !submission ? (
                 <div className="glass-strong rounded-xl p-8 text-center space-y-2 border-border/40">
                   <AlertCircle className="h-8 w-8 text-muted-foreground mx-auto" />
-                  <p className="font-mono text-xs text-muted-foreground">No submission evidence uploaded yet for this KPI.</p>
+                  <p className="font-mono text-xs text-muted-foreground">
+                    No submission evidence uploaded yet for this KPI.
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {/* Metadata Header */}
                   <div className="grid grid-cols-3 gap-2 bg-background/30 p-3 rounded-xl border border-border/40 font-mono text-xs text-center">
                     <div>
-                      <span className="text-[10px] text-muted-foreground uppercase block">Student</span>
-                      <span className="font-medium text-foreground truncate block">{target.studentName}</span>
+                      <span className="text-[10px] text-muted-foreground uppercase block">
+                        Student
+                      </span>
+                      <span className="font-medium text-foreground truncate block">
+                        {target.studentName}
+                      </span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-muted-foreground uppercase block">Venture</span>
-                      <span className="font-medium text-foreground truncate block">{target.subject}</span>
+                      <span className="text-[10px] text-muted-foreground uppercase block">
+                        Venture
+                      </span>
+                      <span className="font-medium text-foreground truncate block">
+                        {target.subject}
+                      </span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-muted-foreground uppercase block">Submitted At</span>
-                      <span className="text-foreground truncate block">{formatDateTime(submission.submitted_at)}</span>
+                      <span className="text-[10px] text-muted-foreground uppercase block">
+                        Submitted At
+                      </span>
+                      <span className="text-foreground truncate block">
+                        {formatDateTime(submission.submitted_at)}
+                      </span>
                     </div>
                   </div>
 
@@ -676,7 +725,11 @@ export function KpiSubmissionModal({
                         disabled={downloading}
                         className="font-mono text-xs cursor-pointer shrink-0"
                       >
-                        {downloading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Download className="mr-1.5 h-3.5 w-3.5" />}
+                        {downloading ? (
+                          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Download className="mr-1.5 h-3.5 w-3.5" />
+                        )}
                         Download
                       </Button>
                     </div>
@@ -699,7 +752,10 @@ export function KpiSubmissionModal({
             <TabsContent value="score" className="space-y-4 pt-4">
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="eval-score" className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                  <Label
+                    htmlFor="eval-score"
+                    className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground"
+                  >
                     Score (Out of {target.totalGrade})
                   </Label>
                   <Input
@@ -717,7 +773,10 @@ export function KpiSubmissionModal({
                 </div>
 
                 <div>
-                  <Label htmlFor="eval-feedback" className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                  <Label
+                    htmlFor="eval-feedback"
+                    className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground"
+                  >
                     Evaluator Feedback (Optional)
                   </Label>
                   <Textarea
@@ -764,15 +823,22 @@ export function KpiSubmissionModal({
                     Save Draft Score
                   </Button>
                 )}
-                {canEvaluatorEdit && canLockKpi && (
+                {canEvaluatorLock && (
                   <Button
                     type="button"
                     disabled={savingScore}
                     onClick={() => {
                       const trimmed = scoreInput.trim();
                       const parsed = trimmed === "" ? null : Number(trimmed);
-                      if (parsed === null || Number.isNaN(parsed) || parsed < 0 || parsed > target.totalGrade) {
-                        toast.error(`Please enter a valid numeric score between 0 and ${target.totalGrade} before locking.`);
+                      if (
+                        parsed === null ||
+                        Number.isNaN(parsed) ||
+                        parsed < 0 ||
+                        parsed > target.totalGrade
+                      ) {
+                        toast.error(
+                          `Please enter a valid numeric score between 0 and ${target.totalGrade} before locking.`,
+                        );
                         return;
                       }
                       setShowLockConfirm(true);
@@ -798,7 +864,8 @@ export function KpiSubmissionModal({
               Lock Evaluation Score?
             </AlertDialogTitle>
             <AlertDialogDescription className="font-mono text-xs text-muted-foreground leading-relaxed pt-1">
-              Saving and locking will finalize this score. The student will no longer be able to submit or edit evidence for this KPI.
+              Saving and locking will finalize this score. The student will no longer be able to
+              submit or edit evidence for this KPI.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2 pt-2">

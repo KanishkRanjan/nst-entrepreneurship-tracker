@@ -3,11 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
 // Helper to fetch user role and venture details on the server
-async function checkKpiPermission(
-  userId: string,
-  ventureId: string,
-  kpiId?: string
-) {
+async function checkKpiPermission(userId: string, ventureId: string, kpiId?: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
   // Get user details
@@ -64,10 +60,9 @@ async function checkKpiPermission(
   const isOwner =
     role === "student" &&
     (venture.user_id === userId ||
-      (userEmailNorm && (ventureRollNorm === userEmailNorm || ventureStudentNameNorm === userEmailNorm)) ||
+      (userEmailNorm &&
+        (ventureRollNorm === userEmailNorm || ventureStudentNameNorm === userEmailNorm)) ||
       (userRollNorm && ventureRollNorm === userRollNorm));
-
-
 
   return {
     role,
@@ -93,9 +88,9 @@ export const addKpiServerFn = createServerFn({ method: "POST" })
         z.object({
           name: z.string(),
           totalGrade: z.number(),
-        })
+        }),
       ),
-    })
+    }),
   )
   .handler(async ({ data, context }) => {
     const { userId } = context;
@@ -127,15 +122,13 @@ export const addKpiServerFn = createServerFn({ method: "POST" })
 
       // Insert subcategories
       if (data.subcategories.length > 0) {
-        const { error: subErr } = await supabaseAdmin
-          .from("kpi_subcategories")
-          .insert(
-            data.subcategories.map((sub) => ({
-              kpi_id: kpi.id,
-              name: sub.name.trim(),
-              total_grade: sub.totalGrade,
-            }))
-          );
+        const { error: subErr } = await supabaseAdmin.from("kpi_subcategories").insert(
+          data.subcategories.map((sub) => ({
+            kpi_id: kpi.id,
+            name: sub.name.trim(),
+            total_grade: sub.totalGrade,
+          })),
+        );
 
         if (subErr) {
           throw new Error(`Subgrade insert error: ${subErr.message}`);
@@ -143,9 +136,9 @@ export const addKpiServerFn = createServerFn({ method: "POST" })
       }
 
       return { success: true, kpiId: kpi.id };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[addKpiServerFn Error]", err);
-      return { success: false, error: err.message || String(err) };
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
     }
   });
 
@@ -162,9 +155,9 @@ export const editKpiServerFn = createServerFn({ method: "POST" })
         z.object({
           name: z.string(),
           totalGrade: z.number(),
-        })
+        }),
       ),
-    })
+    }),
   )
   .handler(async ({ data, context }) => {
     const { userId } = context;
@@ -203,15 +196,13 @@ export const editKpiServerFn = createServerFn({ method: "POST" })
       }
 
       if (data.subcategories.length > 0) {
-        const { error: subErr } = await supabaseAdmin
-          .from("kpi_subcategories")
-          .insert(
-            data.subcategories.map((sub) => ({
-              kpi_id: data.kpiId,
-              name: sub.name.trim(),
-              total_grade: sub.totalGrade,
-            }))
-          );
+        const { error: subErr } = await supabaseAdmin.from("kpi_subcategories").insert(
+          data.subcategories.map((sub) => ({
+            kpi_id: data.kpiId,
+            name: sub.name.trim(),
+            total_grade: sub.totalGrade,
+          })),
+        );
 
         if (subErr) {
           throw new Error(`Subgrade insert error: ${subErr.message}`);
@@ -219,9 +210,9 @@ export const editKpiServerFn = createServerFn({ method: "POST" })
       }
 
       return { success: true };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[editKpiServerFn Error]", err);
-      return { success: false, error: err.message || String(err) };
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
     }
   });
 
@@ -231,7 +222,7 @@ export const deleteKpiServerFn = createServerFn({ method: "POST" })
     z.object({
       kpiId: z.string(),
       ventureId: z.string(),
-    })
+    }),
   )
   .handler(async ({ data, context }) => {
     const { userId } = context;
@@ -256,8 +247,8 @@ export const deleteKpiServerFn = createServerFn({ method: "POST" })
       }
 
       return { success: true };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[deleteKpiServerFn Error]", err);
-      return { success: false, error: err.message || String(err) };
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
     }
   });

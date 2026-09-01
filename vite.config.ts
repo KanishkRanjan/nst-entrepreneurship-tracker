@@ -103,11 +103,12 @@ function apiDevMiddlewarePlugin(): Plugin {
             res.setHeader("Content-Type", "application/json");
             res.end(JSON.stringify(result));
             return;
-          } catch (err: any) {
+          } catch (err: unknown) {
             console.error("[Vite Dev API Upload Error]", err);
             res.statusCode = 400;
             res.setHeader("Content-Type", "application/json");
-            res.end(JSON.stringify({ success: false, statusMessage: err.message }));
+            const statusMessage = err instanceof Error ? err.message : String(err);
+            res.end(JSON.stringify({ success: false, statusMessage }));
             return;
           }
         }
@@ -127,11 +128,12 @@ function apiDevMiddlewarePlugin(): Plugin {
             res.setHeader("Content-Type", "application/json");
             res.end(JSON.stringify(result));
             return;
-          } catch (err: any) {
+          } catch (err: unknown) {
             console.error("[Vite Dev API Download Error]", err);
             res.statusCode = 400;
             res.setHeader("Content-Type", "application/json");
-            res.end(JSON.stringify({ success: false, statusMessage: err.message }));
+            const statusMessage = err instanceof Error ? err.message : String(err);
+            res.end(JSON.stringify({ success: false, statusMessage }));
             return;
           }
         }

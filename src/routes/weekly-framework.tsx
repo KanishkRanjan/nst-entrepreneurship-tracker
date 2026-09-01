@@ -22,6 +22,7 @@ import {
   Trophy,
   Search,
   Layers,
+  type LucideIcon,
 } from "lucide-react";
 import { SEMESTERS, semesterHealth, type Semester, type Week } from "@/lib/weekly-framework";
 import { TpfBadge, TpfBlock } from "@/components/TpfBlock";
@@ -46,7 +47,15 @@ export const Route = createFileRoute("/weekly-framework")({
   component: Page,
 });
 
-function HealthCard({ label, value, icon: Icon }: { label: string; value: number; icon: any }) {
+function HealthCard({
+  label,
+  value,
+  icon: Icon,
+}: {
+  label: string;
+  value: number;
+  icon: LucideIcon;
+}) {
   return (
     <div className="rounded-xl border border-border/60 bg-card/40 p-3">
       <div className="flex items-center justify-between">
@@ -90,7 +99,7 @@ function Section({
   label,
   children,
 }: {
-  icon: any;
+  icon: LucideIcon;
   label: string;
   children: React.ReactNode;
 }) {

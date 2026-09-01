@@ -19,11 +19,19 @@ export default defineEventHandler(async (event) => {
     }
 
     return result;
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[Download Endpoint Error]", err);
+    const statusCode =
+      typeof err === "object" &&
+      err !== null &&
+      "statusCode" in err &&
+      typeof err.statusCode === "number"
+        ? err.statusCode
+        : 404;
     throw createError({
-      statusCode: err.statusCode || 404,
-      statusMessage: err.message || "Could not generate download link.",
+      statusCode,
+      statusMessage:
+        err instanceof Error && err.message ? err.message : "Could not generate download link.",
     });
   }
 });

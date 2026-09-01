@@ -1,4 +1,9 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 function getS3Config() {
@@ -31,7 +36,7 @@ function getS3Client(): { client: S3Client; bucketName: string } {
       ...(!bucketName ? ["AWS_S3_BUCKET"] : []),
     ];
     throw new Error(
-      `AWS S3 storage configuration error: Missing environment variable(s): ${missing.join(", ")}. Please set them in your server environment.`
+      `AWS S3 storage configuration error: Missing environment variable(s): ${missing.join(", ")}. Please set them in your server environment.`,
     );
   }
 
@@ -50,7 +55,11 @@ function getS3Client(): { client: S3Client; bucketName: string } {
  * Logical S3 key structure based on venture ID and submission ID.
  * Example: ventures/venture-123/submissions/sub-456/customer-validation.zip
  */
-export function buildSubmissionS3Key(ventureId: string, submissionId: string, filename: string): string {
+export function buildSubmissionS3Key(
+  ventureId: string,
+  submissionId: string,
+  filename: string,
+): string {
   const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
   return `ventures/${ventureId}/submissions/${submissionId}/${safeFilename}`;
 }
@@ -76,9 +85,9 @@ export async function uploadToS3(params: {
 
     await client.send(command);
     return { key: params.key, bucket: bucketName };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[S3 Upload Error]", err);
-    throw new Error(`AWS S3 Upload Failed: ${err.message || String(err)}`);
+    throw new Error(`AWS S3 Upload Failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
@@ -104,9 +113,11 @@ export async function getSignedDownloadUrl(params: {
     });
 
     return await getSignedUrl(client, command, { expiresIn });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[S3 Presigned URL Error]", err);
-    throw new Error(`AWS S3 Presigned URL Failed: ${err.message || String(err)}`);
+    throw new Error(
+      `AWS S3 Presigned URL Failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
 }
 

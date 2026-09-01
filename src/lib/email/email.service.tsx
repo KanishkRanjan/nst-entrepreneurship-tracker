@@ -33,6 +33,7 @@ export class EmailService {
     recipient_user_id?: string | null;
     type: EmailNotificationType;
     subject: string;
+    dedupeTag?: string;
   }): Promise<{ id: string } | null> {
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -43,7 +44,7 @@ export class EmailService {
             recipient_email: params.recipient_email,
             recipient_user_id: params.recipient_user_id || null,
             type: params.type,
-            subject: params.subject,
+            subject: params.dedupeTag ? `${params.subject} ${params.dedupeTag}` : params.subject,
             status: "PENDING",
             provider: "resend",
           },
@@ -99,6 +100,7 @@ export class EmailService {
     toEmail: string,
     params: EvaluationResultEmailProps,
     studentUserId?: string,
+    dedupeTag?: string,
   ): Promise<void> {
     const subject = "Your Entrepreneurship Evaluation Result is Ready";
     let html = "";
@@ -117,6 +119,7 @@ export class EmailService {
         recipient_user_id: studentUserId || null,
         type: "KPI_SCORED_STUDENT",
         subject,
+        dedupeTag,
       });
       logId = logRecord?.id || null;
     } catch (dbErr) {
@@ -143,6 +146,7 @@ export class EmailService {
   async sendMentorFollowUpEmail(
     toEmail: string,
     params: EvaluationFollowUpEmailProps,
+    dedupeTag?: string,
   ): Promise<void> {
     const subject = `Action Required: Connect with ${params.studentName} Regarding Evaluation`;
     let html = "";
@@ -160,6 +164,7 @@ export class EmailService {
         recipient_email: toEmail,
         type: "CONSECUTIVE_MID_SCORE_MENTOR",
         subject,
+        dedupeTag,
       });
       logId = logRecord?.id || null;
     } catch (dbErr) {
@@ -186,6 +191,7 @@ export class EmailService {
   async sendMentorLowScoreEmail(
     toEmail: string,
     params: EvaluationLowScoreEmailProps,
+    dedupeTag?: string,
   ): Promise<void> {
     const subject = `Attention Required: ${params.studentName}'s Evaluation Score is Below 40%`;
     let html = "";
@@ -203,6 +209,7 @@ export class EmailService {
         recipient_email: toEmail,
         type: "CONSECUTIVE_LOW_SCORE_BOARD",
         subject,
+        dedupeTag,
       });
       logId = logRecord?.id || null;
     } catch (dbErr) {
@@ -229,6 +236,7 @@ export class EmailService {
   async sendAcademicBoardLowScoreEmail(
     toEmail: string,
     params: AcademicBoardLowScoreEmailProps,
+    dedupeTag?: string,
   ): Promise<void> {
     const subject = `Academic Board Notification: ${params.studentName}'s Evaluation Score is Below 40%`;
     let html = "";
@@ -246,6 +254,7 @@ export class EmailService {
         recipient_email: toEmail,
         type: "CONSECUTIVE_LOW_SCORE_BOARD",
         subject,
+        dedupeTag,
       });
       logId = logRecord?.id || null;
     } catch (dbErr) {

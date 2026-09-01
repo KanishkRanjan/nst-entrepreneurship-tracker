@@ -1,6 +1,6 @@
 import ws from "ws";
 if (typeof globalThis.WebSocket === "undefined") {
-  globalThis.WebSocket = ws as any;
+  globalThis.WebSocket = ws as unknown as typeof globalThis.WebSocket;
 }
 
 import "./lib/error-capture";

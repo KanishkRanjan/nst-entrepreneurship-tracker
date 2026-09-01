@@ -25,7 +25,7 @@ export async function processUploadSubmission(params: {
   ventureId: string;
   studentId?: string;
   note: string;
-  fileBuffer: Buffer | null;
+  fileBuffer: Uint8Array | null;
   fileName: string;
   mimeType: string;
   authHeader?: string;
@@ -193,7 +193,7 @@ export async function processUploadSubmission(params: {
     throw new Error(`Database save failed: ${saveErr.message}`);
   }
 
-  return { success: true, submission: savedSubmission };
+  return { success: true as const, submission: savedSubmission };
 }
 
 export async function processDownloadSubmission(params: {
@@ -250,7 +250,7 @@ export async function processDownloadSubmission(params: {
   });
 
   return {
-    success: true,
+    success: true as const,
     url: downloadUrl,
     filename: submission.file_name,
     mimeType: submission.mime_type,
